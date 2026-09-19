@@ -16,7 +16,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 /// - Abre o seletor de arquivos do Android para o upload de plantas.
 const String kNetFloorUrl = 'https://rogerdev5690.github.io/netfloor/';
 const String kAllowedHost = 'rogerdev5690.github.io';
-const String kShellVersion = '3.0.0';
+const String kShellVersion = '3.1.0';
 
 const MethodChannel _diagChannel = MethodChannel('netfloor/diag');
 
@@ -85,7 +85,12 @@ class _ShellPageState extends State<ShellPage> {
   }
 
   // <input type="file"> do app web (upload de planta) -> seletor nativo do Android.
+  // Suporta seleção múltipla (várias plantas de uma vez = vários pavimentos).
   Future<List<String>> _onShowFileSelector(FileSelectorParams params) async {
+    if (params.mode == FileSelectorMode.openMultiple) {
+      final files = await FilePicker.pickFiles(type: FileType.image);
+      return [for (final f in files) f.uri.toString()];
+    }
     final file = await FilePicker.pickFile(type: FileType.image);
     return file == null ? <String>[] : [file.uri.toString()];
   }
