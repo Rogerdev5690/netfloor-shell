@@ -1,14 +1,21 @@
 package com.netfloor.netfloor_shell
 
+import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.net.ConnectException
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -17,6 +24,9 @@ import java.net.Socket
  * Diagnóstico Wi-Fi nativo usado pela aba "NetFloor Diagnostic": varredura de
  * redes, RSSI/velocidade PHY da conexão atual e ping. Cada método devolve uma
  * string JSON; o Dart do Shell repassa o resultado ao app web via ponte JS.
+ *
+ * Também entrega arquivos gerados pelo app web (laudo em PDF, projeto .json):
+ * grava em Downloads/NetFloor ou abre a folha de compartilhamento do Android.
  */
 class MainActivity : FlutterActivity() {
 
@@ -30,6 +40,13 @@ class MainActivity : FlutterActivity() {
                     "ping" -> {
                         val host = call.argument<String>("host") ?: ""
                         runAsync(result) { ping(host) }
+                    }
+                    "saveFile" -> {
+                        val name = call.argument<String>("name") ?: "netfloor.bin"
+                        val mime = call.argument<String>("mime") ?: "application/octet-stream"
+                        val share = call.argument<Boolean>("share") ?: false
+                        val bytes = call.argument<ByteArray>("bytes") ?: ByteArray(0)
+                        runAsync(result) { if (share) shareFile(name, mime, bytes) else saveToDownloads(name, mime, bytes) }
                     }
                     else -> result.notImplemented()
                 }
@@ -167,5 +184,59 @@ class MainActivity : FlutterActivity() {
             }
         }
         return null
+    }
+
+    // ------------------------------------------------------------------
+    // Entrega de arquivos
+    // ------------------------------------------------------------------
+
+    /** Nome de arquivo sem separadores de caminho ou caracteres problemáticos. */
+    private fun safeName(name: String): String {
+        val cleaned = name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
+        return if (cleaned.isEmpty()) "netfloor.bin" else cleaned.take(120)
+    }
+
+    /** Grava em Downloads/NetFloor (MediaStore no Android 10+, pasta do app antes disso). */
+    private fun saveToDownloads(rawName: String, mime: String, bytes: ByteArray): String {
+        val name = safeName(rawName)
+        val out = JSONObject()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, name)
+                put(MediaStore.Downloads.MIME_TYPE, mime)
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/NetFloor")
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val resolver = applicationContext.contentResolver
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: return out.put("error", "Não foi possível criar o arquivo em Downloads").toString()
+            resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                ?: return out.put("error", "Não foi possível gravar o arquivo").toString()
+            values.clear()
+            values.put(MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            return out.put("location", "Salvo em Downloads/NetFloor: $name").toString()
+        }
+        val dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
+        val file = File(dir, name)
+        file.writeBytes(bytes)
+        return out.put("location", "Salvo em ${file.absolutePath}").toString()
+    }
+
+    /** Grava no cache e abre a folha de compartilhamento (WhatsApp, e-mail, Drive...). */
+    private fun shareFile(rawName: String, mime: String, bytes: ByteArray): String {
+        val name = safeName(rawName)
+        val dir = File(cacheDir, "shared").apply { mkdirs() }
+        val file = File(dir, name)
+        file.writeBytes(bytes)
+        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, name)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        runOnUiThread { startActivity(Intent.createChooser(intent, "Compartilhar $name")) }
+        return JSONObject().put("location", "Compartilhando $name").toString()
     }
 }
