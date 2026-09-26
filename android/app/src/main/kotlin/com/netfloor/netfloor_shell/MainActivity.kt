@@ -21,12 +21,12 @@ import java.net.InetSocketAddress
 import java.net.Socket
 
 /**
- * Diagnóstico Wi-Fi nativo usado pela aba "NetFloor Diagnostic": varredura de
+ * Diagnóstico Wi-Fi nativo usado pela aba "WaveLens Diagnostic": varredura de
  * redes, RSSI/velocidade PHY da conexão atual e ping. Cada método devolve uma
  * string JSON; o Dart do Shell repassa o resultado ao app web via ponte JS.
  *
  * Também entrega arquivos gerados pelo app web (laudo em PDF, projeto .json):
- * grava em Downloads/NetFloor ou abre a folha de compartilhamento do Android.
+ * grava em Downloads/WaveLens ou abre a folha de compartilhamento do Android.
  */
 class MainActivity : FlutterActivity() {
 
@@ -196,7 +196,7 @@ class MainActivity : FlutterActivity() {
         return if (cleaned.isEmpty()) "netfloor.bin" else cleaned.take(120)
     }
 
-    /** Grava em Downloads/NetFloor (MediaStore no Android 10+, pasta do app antes disso). */
+    /** Grava em Downloads/WaveLens (MediaStore no Android 10+, pasta do app antes disso). */
     private fun saveToDownloads(rawName: String, mime: String, bytes: ByteArray): String {
         val name = safeName(rawName)
         val out = JSONObject()
@@ -204,7 +204,7 @@ class MainActivity : FlutterActivity() {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)
                 put(MediaStore.Downloads.MIME_TYPE, mime)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/NetFloor")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/WaveLens")
                 put(MediaStore.Downloads.IS_PENDING, 1)
             }
             val resolver = applicationContext.contentResolver
@@ -215,7 +215,7 @@ class MainActivity : FlutterActivity() {
             values.clear()
             values.put(MediaStore.Downloads.IS_PENDING, 0)
             resolver.update(uri, values, null, null)
-            return out.put("location", "Salvo em Downloads/NetFloor: $name").toString()
+            return out.put("location", "Salvo em Downloads/WaveLens: $name").toString()
         }
         val dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
         val file = File(dir, name)

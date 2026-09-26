@@ -8,30 +8,32 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-/// NetFloor Shell: um wrapper fino (WebView) em torno do app hospedado.
+/// WaveLens Shell: um wrapper fino (WebView) em torno do app hospedado.
 ///
-/// - Toda a UI/lógica do NetFloor vive no build web publicado em [kNetFloorUrl],
+/// - Toda a UI/lógica do WaveLens vive no build web publicado em [kWaveLensUrl],
 ///   então atualizações chegam sem trocar o APK.
 /// - Expõe ao app web a ponte JS `NetFloorNative` (Wi-Fi scan, RSSI/PHY e ping),
-///   implementada em MainActivity.kt, para a aba "NetFloor Diagnostic".
+///   implementada em MainActivity.kt, para a aba "WaveLens Diagnostic". O nome
+///   do canal (`NetFloorNative`) é um identificador técnico interno, mantido
+///   por compatibilidade com o app web publicado — não é visível ao usuário.
 /// - Abre o seletor de arquivos do Android para o upload de plantas, logo e projetos (.json).
 /// - Entrega arquivos gerados pelo app web (laudo em PDF, projeto .json): salva em
-///   Downloads/NetFloor ou abre a folha de compartilhamento (método `saveFile`).
-const String kNetFloorUrl = 'https://rogerdev5690.github.io/netfloor/';
+///   Downloads/WaveLens ou abre a folha de compartilhamento (método `saveFile`).
+const String kWaveLensUrl = 'https://rogerdev5690.github.io/netfloor/';
 const String kAllowedHost = 'rogerdev5690.github.io';
-const String kShellVersion = '3.2.0';
+const String kShellVersion = '3.3.0';
 
 const MethodChannel _diagChannel = MethodChannel('netfloor/diag');
 
-void main() => runApp(const NetFloorShellApp());
+void main() => runApp(const WaveLensShellApp());
 
-class NetFloorShellApp extends StatelessWidget {
-  const NetFloorShellApp({super.key});
+class WaveLensShellApp extends StatelessWidget {
+  const WaveLensShellApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'NetFloor',
+      title: 'WaveLens',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
       home: const ShellPage(),
@@ -60,7 +62,7 @@ class _ShellPageState extends State<ShellPage> {
       ..addJavaScriptChannel('NetFloorNative', onMessageReceived: (msg) => _onBridgeMessage(msg.message))
       ..setNavigationDelegate(
         NavigationDelegate(
-          // A ponte nativa só pode ser alcançada por páginas do próprio NetFloor.
+          // A ponte nativa só pode ser alcançada por páginas do próprio WaveLens.
           onNavigationRequest: (request) {
             final host = Uri.tryParse(request.url)?.host ?? '';
             return host == kAllowedHost ? NavigationDecision.navigate : NavigationDecision.prevent;
@@ -74,12 +76,12 @@ class _ShellPageState extends State<ShellPage> {
             if (error.isForMainFrame == false) return;
             setState(() {
               _loading = false;
-              _error = 'Não foi possível carregar o NetFloor.\nVerifique sua conexão com a internet.';
+              _error = 'Não foi possível carregar o WaveLens.\nVerifique sua conexão com a internet.';
             });
           },
         ),
       )
-      ..loadRequest(Uri.parse(kNetFloorUrl));
+      ..loadRequest(Uri.parse(kWaveLensUrl));
 
     final platform = _controller.platform;
     if (platform is AndroidWebViewController) {
@@ -188,7 +190,7 @@ class _ShellPageState extends State<ShellPage> {
       _loading = true;
       _error = null;
     });
-    _controller.loadRequest(Uri.parse(kNetFloorUrl));
+    _controller.loadRequest(Uri.parse(kWaveLensUrl));
   }
 
   @override
